@@ -11,7 +11,7 @@ Streamlit을 활용한 Excel 가상 데이터 자동 생성 도구입니다. 여
 - **자동 폴더 생성**: 지정한 경로에 자동으로 폴더 생성 및 파일 저장
 
 ## 🛠 설치 및 실행
-
+배포 주소 : [Streamlit](https://fdgmadebymoon.streamlit.app/)
 ### 1. 가상환경 생성 및 활성화
 ```bash
 python -m venv venv
