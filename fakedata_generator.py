@@ -51,12 +51,22 @@ for i in range(file_count):
     file_inputs.append({'file_name': file_name, 'columns': columns})
 
 if st.button('가상 데이터 생성 및 저장'):
-    os.makedirs(folder, exist_ok=True)
-    for file_input in file_inputs:
-        data = {}
-        for col in file_input['columns']:
-            data[col['name']] = [get_value(col['type'], col['min'], col['max']) for _ in range(300)]
-        df = pd.DataFrame(data)
-        save_path = os.path.join(folder, f"{file_input['file_name']}.xlsx")
-        df.to_excel(save_path, index=False)
-    st.success(f'모든 파일이 "{folder}" 폴더에 저장되었습니다!')
+    if not folder.strip():
+        st.error('저장할 폴더 경로를 입력하세요.')
+    else:
+        try:
+            os.makedirs(folder, exist_ok=True)
+        except Exception as e:
+            st.error(f'폴더를 생성할 수 없습니다: {e}')
+        else:
+            try:
+                for file_input in file_inputs:
+                    data = {}
+                    for col in file_input['columns']:
+                        data[col['name']] = [get_value(col['type'], col['min'], col['max']) for _ in range(300)]
+                    df = pd.DataFrame(data)
+                    save_path = os.path.join(folder, f"{file_input['file_name']}.xlsx")
+                    df.to_excel(save_path, index=False)
+                st.success(f'모든 파일이 "{folder}" 폴더에 저장되었습니다!')
+            except Exception as e:
+                st.error(f'파일 저장 중 오류가 발생했습니다: {e}')
