@@ -3,12 +3,14 @@ import pandas as pd
 import numpy as np
 import os
 from datetime import datetime, timedelta
+import io
+import zipfile
 
 st.title('가상 데이터 자동 생성기')
 
 st.markdown('''
 - 여러 파일의 컬럼명, 값 타입, 범위 등을 입력하세요.
-- 각 파일마다 300행의 랜덤 데이터를 생성해 지정 폴더에 Excel로 저장합니다.
+- 각 파일마다 300행의 랜덤 데이터를 생성해 ZIP 파일로 다운로드할 수 있습니다.
 ''')
 
 def get_value(val_type, min_val, max_val):
@@ -27,7 +29,8 @@ def get_value(val_type, min_val, max_val):
     else:
         return ''
 
-folder = st.text_input('저장할 폴더 경로', value='output')
+# 폴더 경로 입력란 제거 (Streamlit Cloud에서는 불필요)
+# folder = st.text_input('저장할 폴더 경로', value='output')
 
 file_count = st.number_input('생성할 파일 개수', min_value=1, max_value=10, value=1, step=1)
 
@@ -50,23 +53,58 @@ for i in range(file_count):
         columns.append({'name': col_name, 'type': val_type, 'min': min_val, 'max': max_val})
     file_inputs.append({'file_name': file_name, 'columns': columns})
 
-if st.button('가상 데이터 생성 및 저장'):
-    if not folder.strip():
-        st.error('저장할 폴더 경로를 입력하세요.')
+if st.button('가상 데이터 생성 및 다운로드'):
+    # 입력값 검증
+    all_valid = True
+    error_messages = []
+    
+    for i, file_input in enumerate(file_inputs):
+        if not file_input['file_name'].strip():
+            error_messages.append(f"파일 {i+1}의 파일명을 입력하세요.")
+            all_valid = False
+        
+        for j, col in enumerate(file_input['columns']):
+            if not col['name'].strip():
+                error_messages.append(f"파일 {i+1}의 컬럼 {j+1} 이름을 입력하세요.")
+                all_valid = False
+            if not col['min'].strip() or not col['max'].strip():
+                error_messages.append(f"파일 {i+1}의 컬럼 {j+1} 최소/최대값을 입력하세요.")
+                all_valid = False
+    
+    if not all_valid:
+        for msg in error_messages:
+            st.error(msg)
     else:
         try:
-            os.makedirs(folder, exist_ok=True)
-        except Exception as e:
-            st.error(f'폴더를 생성할 수 없습니다: {e}')
-        else:
-            try:
+            # 여러 파일을 ZIP으로 묶어서 다운로드 제공
+            zip_buffer = io.BytesIO()
+            
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 for file_input in file_inputs:
                     data = {}
                     for col in file_input['columns']:
                         data[col['name']] = [get_value(col['type'], col['min'], col['max']) for _ in range(300)]
                     df = pd.DataFrame(data)
-                    save_path = os.path.join(folder, f"{file_input['file_name']}.xlsx")
-                    df.to_excel(save_path, index=False)
-                st.success(f'모든 파일이 "{folder}" 폴더에 저장되었습니다!')
-            except Exception as e:
-                st.error(f'파일 저장 중 오류가 발생했습니다: {e}')
+                    
+                    # Excel 파일을 메모리에 생성
+                    excel_buffer = io.BytesIO()
+                    df.to_excel(excel_buffer, index=False)
+                    excel_buffer.seek(0)
+                    
+                    # ZIP에 추가
+                    zip_file.writestr(f"{file_input['file_name']}.xlsx", excel_buffer.getvalue())
+            
+            zip_buffer.seek(0)
+            
+            st.success(f'총 {len(file_inputs)}개의 파일이 생성되었습니다!')
+            
+            # 다운로드 버튼 제공
+            st.download_button(
+                label=" ZIP 파일 다운로드",
+                data=zip_buffer,
+                file_name="generated_data.zip",
+                mime="application/zip"
+            )
+            
+        except Exception as e:
+            st.error(f'파일 생성 중 오류가 발생했습니다: {e}')
